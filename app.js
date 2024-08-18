@@ -3,7 +3,7 @@ const http = require("http");
 const url = require("url");
 const uuid = require("uuid");
 const express = require("express");
-const net = require("net"); // إضافة مكتبة net
+const dgram = require("dgram"); // إضافة مكتبة dgram
 const app = express();
 
 const server = http.createServer(app);
@@ -25,42 +25,45 @@ wss.on("connection", (ws, request) => {
   const tunnelId = pathname.split("/")[2];
 
   if (!tunnels.has(tunnelId)) {
-    tunnels.set(tunnelId, { ws: new Set(), tcp: null });
+    tunnels.set(tunnelId, { ws: new Set(), udp: null });
   }
   tunnels.get(tunnelId).ws.add(ws);
 
-  if (!tunnels.get(tunnelId).tcp) {
-    const tcpClient = new net.Socket();
-    tcpClient.connect(25565, 'localhost', () => {
-      console.log(`Connected to TCP server on port 25565`);
+  if (!tunnels.get(tunnelId).udp) {
+    // إنشاء خادم UDP
+    const udpServer = dgram.createSocket("udp4");
+
+    udpServer.on("message", (msg) => {
+      ws.send(msg); // إرسال البيانات من UDP إلى WebSocket
     });
 
-    tcpClient.on('data', (data) => {
-      ws.send(data); // إرسال البيانات من TCP إلى WebSocket
+    udpServer.on("error", (err) => {
+      console.error("UDP error:", err);
     });
 
-    tcpClient.on('close', () => {
-      console.log('TCP connection closed');
+    udpServer.bind(19132, () => {
+      console.log("UDP server listening on port 19132");
     });
 
-    tcpClient.on('error', (err) => {
-      console.error('TCP error:', err);
-    });
-
-    tunnels.get(tunnelId).tcp = tcpClient;
+    tunnels.get(tunnelId).udp = udpServer;
   }
 
   ws.on("message", (message) => {
     const tunnel = tunnels.get(tunnelId);
-    if (tunnel.tcp) {
-      tunnel.tcp.write(message); // إرسال البيانات من WebSocket إلى TCP
+    if (tunnel.udp) {
+      // إرسال البيانات من WebSocket إلى UDP
+      tunnel.udp.send(message, 0, message.length, 19132, 'localhost', (err) => {
+        if (err) {
+          console.error("Error sending UDP message:", err);
+        }
+      });
     }
   });
 
   ws.on("close", () => {
     tunnels.get(tunnelId).ws.delete(ws);
-    if (tunnels.get(tunnelId).ws.size === 0 && tunnels.get(tunnelId).tcp) {
-      tunnels.get(tunnelId).tcp.end(); // إغلاق اتصال TCP
+    if (tunnels.get(tunnelId).ws.size === 0 && tunnels.get(tunnelId).udp) {
+      tunnels.get(tunnelId).udp.close(); // إغلاق اتصال UDP
       tunnels.delete(tunnelId);
     }
   });
