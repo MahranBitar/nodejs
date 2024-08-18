@@ -1,24 +1,17 @@
 {
-  "name": "nodejs",
+  "name": "nodejs-tunnel-server",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A Node.js server for tunneling using WebSockets",
+  "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node app.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/node": "^18.0.6",
     "express": "^4.19.2",
-    "http-proxy-middleware": "^3.0.0",
     "uuid": "^10.0.0",
     "ws": "^8.18.0"
   }
 }
-,
-  "scripts": {
-    "start": "node app.js"
-  }
-
