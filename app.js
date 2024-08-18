@@ -3,72 +3,60 @@ const http = require("http");
 const url = require("url");
 const uuid = require("uuid");
 const express = require("express");
-const dgram = require("dgram"); // إضافة مكتبة dgram
 const app = express();
 
+// إنشاء خادم HTTP
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
-const tunnels = new Map();
+const tunnels = new Map(); // لتخزين الأنفاق النشطة
 
+// معالجة الطلبات على المسار '/'
 app.get("/", (req, res) => {
-  res.send("Welcome to the Tunnel Server!");
+  res.send("Welcome to the Tunnel Server!"); // رسالة ترحيبية
 });
 
+// إنشاء نفق جديد وتوفير رابط النفق للمستخدم
 app.get("/create-tunnel", (req, res) => {
-  const tunnelId = uuid.v4();
+  const tunnelId = uuid.v4(); // إنشاء معرف فريد للنفق
   const tunnelUrl = `wss://${req.headers.host}/tunnel/${tunnelId}`;
-  res.json({ url: tunnelUrl });
+  res.json({ url: tunnelUrl }); // إرسال رابط النفق إلى العميل
 });
 
+// التعامل مع اتصالات WebSocket
 wss.on("connection", (ws, request) => {
   const pathname = url.parse(request.url).pathname;
-  const tunnelId = pathname.split("/")[2];
+  const tunnelId = pathname.split("/")[2]; // استخراج ID النفق من URL
 
   if (!tunnels.has(tunnelId)) {
-    tunnels.set(tunnelId, { ws: new Set(), udp: null });
+    tunnels.set(tunnelId, new Set()); // إنشاء مجموعة جديدة للاتصالات
   }
-  tunnels.get(tunnelId).ws.add(ws);
+  tunnels.get(tunnelId).add(ws); // إضافة الاتصال إلى النفق المحدد
 
-  if (!tunnels.get(tunnelId).udp) {
-    // إنشاء خادم UDP
-    const udpServer = dgram.createSocket("udp4");
+  console.log(`User connected to tunnel ${tunnelId}`);
+  console.log(`Tunnel URL: wss://${request.headers.host}/tunnel/${tunnelId}`); // طباعة رابط النفق
 
-    udpServer.on("message", (msg) => {
-      ws.send(msg); // إرسال البيانات من UDP إلى WebSocket
-    });
-
-    udpServer.on("error", (err) => {
-      console.error("UDP error:", err);
-    });
-
-    udpServer.bind(19132, () => {
-      console.log("UDP server listening on port 19132");
-    });
-
-    tunnels.get(tunnelId).udp = udpServer;
-  }
-
+  // التعامل مع الرسائل الواردة
   ws.on("message", (message) => {
-    const tunnel = tunnels.get(tunnelId);
-    if (tunnel.udp) {
-      // إرسال البيانات من WebSocket إلى UDP
-      tunnel.udp.send(message, 0, message.length, 19132, 'localhost', (err) => {
-        if (err) {
-          console.error("Error sending UDP message:", err);
-        }
-      });
-    }
+    console.log(`Received message on ${tunnelId}: ${message}`);
+    // توجيه الرسالة إلى جميع المستخدمين في النفق المحدد
+    tunnels.get(tunnelId).forEach((client) => {
+      if (client !== ws && client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    });
   });
 
+  // التعامل مع إغلاق الاتصال
   ws.on("close", () => {
-    tunnels.get(tunnelId).ws.delete(ws);
-    if (tunnels.get(tunnelId).ws.size === 0 && tunnels.get(tunnelId).udp) {
-      tunnels.get(tunnelId).udp.close(); // إغلاق اتصال UDP
-      tunnels.delete(tunnelId);
+    console.log(`User disconnected from tunnel ${tunnelId}`);
+    tunnels.get(tunnelId).delete(ws); // إزالة الاتصال من النفق
+    if (tunnels.get(tunnelId).size === 0) {
+      tunnels.delete(tunnelId); // حذف النفق إذا لم يتبقى فيه اتصالات
     }
   });
 });
 
+// التعامل مع ترقية طلبات WebSocket
 server.on("upgrade", (request, socket, head) => {
   const pathname = url.parse(request.url).pathname;
   if (pathname.startsWith("/tunnel/")) {
