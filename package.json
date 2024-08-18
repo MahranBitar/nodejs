@@ -1,17 +1,16 @@
 {
-  "name": "nodejs-tunnel-server",
+  "name": "nodejs-app",
   "version": "1.0.0",
-  "description": "A Node.js server for tunneling using WebSockets",
+  "description": "A minimal Node.js web application.",
   "main": "app.js",
-  "scripts": {
-    "start": "node app.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "alphasec",
+  "license": "MIT",
   "dependencies": {
-    "express": "^4.19.2",
     "uuid": "^10.0.0",
     "ws": "^8.18.0"
+    "express": "^4.19.2"
+  },
+  "scripts": {
+    "start": "node app.js"
   }
 }
