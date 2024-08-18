@@ -39,19 +39,20 @@ wss.on("connection", (ws, request) => {
   ws.on("message", (message) => {
     const messageType = typeof message; // نوع الرسالة
     const messageLength = Buffer.byteLength(message, 'utf8'); // طول الرسالة
-    console.log(`Received ${messageType} message (${messageLength} bytes) on tunnel ${tunnelId}: ${message}`);
+    console.log(`[Tunnel ${tunnelId}] Received ${messageType} message (${messageLength} bytes): ${message}`);
 
     // توجيه الرسالة إلى جميع المستخدمين في النفق المحدد
     tunnels.get(tunnelId).forEach((client) => {
       if (client !== ws && client.readyState === WebSocket.OPEN) {
         client.send(message);
+        console.log(`[Tunnel ${tunnelId}] Sent message (${messageLength} bytes) to another client.`);
       }
     });
   });
 
   // التعامل مع إغلاق الاتصال
   ws.on("close", () => {
-    console.log(`User disconnected from tunnel ${tunnelId}`);
+    console.log(`[Tunnel ${tunnelId}] User disconnected.`);
     tunnels.get(tunnelId).delete(ws); // إزالة الاتصال من النفق
     if (tunnels.get(tunnelId).size === 0) {
       tunnels.delete(tunnelId); // حذف النفق إذا لم يتبقى فيه اتصالات
