@@ -37,7 +37,10 @@ wss.on("connection", (ws, request) => {
 
   // التعامل مع الرسائل الواردة
   ws.on("message", (message) => {
-    console.log(`Received message on ${tunnelId}: ${message}`);
+    const messageType = typeof message; // نوع الرسالة
+    const messageLength = Buffer.byteLength(message, 'utf8'); // طول الرسالة
+    console.log(`Received ${messageType} message (${messageLength} bytes) on tunnel ${tunnelId}: ${message}`);
+
     // توجيه الرسالة إلى جميع المستخدمين في النفق المحدد
     tunnels.get(tunnelId).forEach((client) => {
       if (client !== ws && client.readyState === WebSocket.OPEN) {
