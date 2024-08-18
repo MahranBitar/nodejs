@@ -7,7 +7,7 @@
   "license": "MIT",
   "dependencies": {
     "uuid": "^10.0.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
     "express": "^4.19.2"
   },
   "scripts": {
