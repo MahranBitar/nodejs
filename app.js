@@ -10,7 +10,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 const tunnels = new Map(); // لتخزين الأنفاق النشطة
-const udpPort = 0; // سيتم تعيينه لاحقًا
+const udpPort = 7551; // تعيين المنفذ المحدد
 
 // إعداد خادم UDP
 const udpServer = dgram.createSocket("udp4");
@@ -45,12 +45,16 @@ wss.on("connection", (ws, request) => {
     console.log(`[Tunnel ${tunnelId}] Received WebSocket message: ${message}`);
 
     // إرسال الرسالة عبر UDP إلى خادم UDP
-    const buffer = Buffer.from(message);
-    udpServer.send(buffer, 0, buffer.length, udpPort, 'localhost', (err) => {
-      if (err) {
-        console.error(`Error sending UDP message: ${err}`);
-      }
-    });
+    try {
+      const buffer = Buffer.from(message);
+      udpServer.send(buffer, 0, buffer.length, udpPort, 'localhost', (err) => {
+        if (err) {
+          console.error(`Error sending UDP message: ${err}`);
+        }
+      });
+    } catch (error) {
+      console.error(`Error processing WebSocket message: ${error}`);
+    }
   });
 
   // التعامل مع إغلاق الاتصال
@@ -80,18 +84,21 @@ udpServer.on("message", (message, rinfo) => {
   console.log(`Received UDP message: ${message} from ${rinfo.address}:${rinfo.port}`);
   
   // إرسال الرسالة إلى جميع العملاء في النفق المحدد
-  for (const [tunnelId, clients] of tunnels) {
-    clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    });
+  try {
+    for (const [tunnelId, clients] of tunnels) {
+      clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+        }
+      });
+    }
+  } catch (error) {
+    console.error(`Error sending UDP message to WebSocket clients: ${error}`);
   }
 });
 
-// تعيين المنفذ UDP عشوائيًا واستدعاء الاستماع عليه
-udpServer.bind(() => {
-  udpPort = udpServer.address().port;
+// تعيين المنفذ UDP المحدد واستدعاء الاستماع عليه
+udpServer.bind(udpPort, () => {
   console.log(`UDP server is listening on port ${udpPort}`);
 });
 
