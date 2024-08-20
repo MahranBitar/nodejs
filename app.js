@@ -17,27 +17,24 @@ const udpPorts = [7551, 19132]; // قائمة البورتات المطلوبة
 const udpServers = udpPorts.map(port => {
   const server = dgram.createSocket("udp4");
 
-  server.on("message", (message, rinfo) => {
-    console.log(`Received UDP message on port ${port}`);
-    
-    // إرسال الرسالة إلى جميع العملاء في النفق المحدد
-    try {
-      for (const [tunnelId, clients] of tunnels) {
-        clients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
-          }
-        });
-      }
-    } catch (error) {
-      console.error(`Error sending UDP message to WebSocket clients: ${error}`);
+server.on("message", (message, rinfo) => {
+  console.log(`Received UDP message on port ${port}`);
+  
+  // إرسال الرسالة إلى جميع العملاء في النفق المحدد
+  try {
+    for (const [tunnelId, clients] of tunnels) {
+      clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          // تحويل الرسالة إلى نص إذا كانت بايتات
+          const textMessage = typeof message === 'string' ? message : message.toString();
+          client.send(textMessage);
+        }
+      });
     }
-  });
-
-  server.bind(port, () => {
-    console.log(`UDP server is listening on port ${port}`);
-  });
-
+  } catch (error) {
+    console.error(`Error sending UDP message to WebSocket clients: ${error}`);
+  }
+});
   return server;
 });
 
