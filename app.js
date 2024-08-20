@@ -59,6 +59,9 @@ app.get("/create-tunnel", (req, res) => {
 
 // التعامل مع اتصالات WebSocket
 wss.on("connection", (ws, request) => {
+  const clientAddress = request.headers['x-forwarded-for'] || request.socket.remoteAddress;
+  console.log(`Client connected from IP: ${clientAddress}`);
+
   const pathname = url.parse(request.url).pathname;
   const tunnelId = pathname.split("/")[2]; // استخراج ID النفق من URL
 
@@ -67,7 +70,6 @@ wss.on("connection", (ws, request) => {
   }
   tunnels.get(tunnelId).add(ws);
 
-  const clientAddress = ws._socket.remoteAddress;
   deviceData.set(ws, { address: clientAddress });
   console.log(`User connected to tunnel ${tunnelId}`);
   console.log(`Tunnel URL: wss://${request.headers.host}/tunnel/${tunnelId}`);
@@ -95,6 +97,7 @@ wss.on("connection", (ws, request) => {
     }
   });
 });
+
 
 // التعامل مع ترقية طلبات WebSocket
 server.on("upgrade", (request, socket, head) => {
