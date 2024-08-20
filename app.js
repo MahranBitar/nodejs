@@ -10,33 +10,36 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 const tunnels = new Map(); // لتخزين الأنفاق النشطة
 const deviceData = new Map(); // لتخزين بيانات الأجهزة المتصلة
-const udpPorts = [7551]; // قائمة البورتات المطلوبة
 
-// إعداد خوادم UDP
-const udpServers = udpPorts.map(port => {
-  const server = dgram.createSocket("udp4");
+// إعداد خادم UDP للاستماع على جميع البورتات
+const udpServer = dgram.createSocket("udp4");
 
-  server.on("message", (message, rinfo) => {
-    console.log(`Received UDP message on port ${port}`);
+udpServer.on("message", (message, rinfo) => {
+  console.log(`Received UDP message from ${rinfo.address}:${rinfo.port}`);
 
-    // إرسال الرسالة إلى جميع العملاء في النفق المحدد
-    try {
-      for (const [tunnelId, clients] of tunnels) {
-        clients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
-          }
-        });
-      }
-    } catch (error) {
-      console.error(`Error sending UDP message to WebSocket clients: ${error}`);
+  // إرسال الرسالة إلى جميع العملاء في النفق المحدد
+  try {
+    for (const [tunnelId, clients] of tunnels) {
+      clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+        }
+      });
     }
-  });
-
-  server.bind(port); // تأكد من بدء الاستماع على البورت المحدد
-
-  return server;
+  } catch (error) {
+    console.error(`Error sending UDP message to WebSocket clients: ${error}`);
+  }
 });
+
+// تحديد نطاق البورتات الذي تريد الاستماع له، أو استخدم فقط `udpServer.bind()` للاستماع لكل البورتات المتاحة
+const portRangeStart = 1000; // بداية نطاق البورتات
+const portRangeEnd = 65535; // نهاية نطاق البورتات
+
+for (let port = portRangeStart; port <= portRangeEnd; port++) {
+  udpServer.bind(port, () => {
+    console.log(`Listening on UDP port ${port}`);
+  });
+}
 
 // معالجة الطلبات على المسار '/'
 app.get("/", (req, res) => {
