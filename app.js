@@ -24,8 +24,7 @@ const udpServers = udpPorts.map(port => {
       for (const [tunnelId, clients] of tunnels) {
         clients.forEach((client) => {
           if (client.readyState === WebSocket.OPEN) {
-            const textMessage = typeof message === 'string' ? message : message.toString();
-            client.send(textMessage);
+            client.send(message);
           }
         });
       }
