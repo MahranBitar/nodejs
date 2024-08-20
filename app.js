@@ -111,8 +111,8 @@ server.on("upgrade", (request, socket, head) => {
 // تشغيل الخادم HTTP
 server.listen(process.env.PORT || 8080, () => {
   console.log("Server is listening on port 8080");
-  wss.on("connection", (ws, request) => {
-  const clientAddress = ws._socket.remoteAddress;
+wss.on("connection", (ws, request) => {
+  const clientAddress = request.socket.remoteAddress || ws._socket.remoteAddress;
   console.log(`Client connected from IP: ${clientAddress}`);
 });
 
