@@ -10,6 +10,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 const tunnels = new Map(); // لتخزين الأنفاق النشطة
+const deviceData = new Map(); // لتخزين بيانات الأجهزة المتصلة
 const udpPort = 7551; // تعيين المنفذ المحدد
 
 // إعداد خادم UDP
@@ -37,6 +38,9 @@ wss.on("connection", (ws, request) => {
   }
   tunnels.get(tunnelId).add(ws); // إضافة الاتصال إلى النفق المحدد
 
+  // جمع بيانات الجهاز المتصل
+  const clientAddress = ws._socket.remoteAddress; // عنوان IP للجهاز المتصل
+  deviceData.set(ws, { address: clientAddress });
   console.log(`User connected to tunnel ${tunnelId}`);
   console.log(`Tunnel URL: wss://${request.headers.host}/tunnel/${tunnelId}`); // طباعة رابط النفق
 
@@ -44,16 +48,27 @@ wss.on("connection", (ws, request) => {
   ws.on("message", (message) => {
     console.log(`[Tunnel ${tunnelId}] Received WebSocket message: ${message}`);
 
-    // إرسال الرسالة عبر UDP إلى خادم UDP
-    try {
-      const buffer = Buffer.from(message);
-      udpServer.send(buffer, 0, buffer.length, udpPort, 'localhost', (err) => {
+    if (message.includes("broadcast")) {
+      // معالجة حزم البثوث
+      // إجراء التعديلات اللازمة على الحزمة
+      const modifiedMessage = `Modified: ${message}`;
+      
+      // إرسال الرسالة المعدلة إلى جميع العملاء في النفق
+      tunnels.get(tunnelId).forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(modifiedMessage);
+        }
+      });
+
+      // إرسال استجابة إلى جهاز A
+      ws.send("Message broadcasted to all clients.");
+    } else {
+      // معالجة الحزم الأخرى (مثل الحزم التي تحتوي على أرقام 19132 و7551)
+      udpServer.send(message, 0, message.length, udpPort, 'localhost', (err) => {
         if (err) {
           console.error(`Error sending UDP message: ${err}`);
         }
       });
-    } catch (error) {
-      console.error(`Error processing WebSocket message: ${error}`);
     }
   });
 
@@ -61,6 +76,7 @@ wss.on("connection", (ws, request) => {
   ws.on("close", () => {
     console.log(`[Tunnel ${tunnelId}] User disconnected.`);
     tunnels.get(tunnelId).delete(ws); // إزالة الاتصال من النفق
+    deviceData.delete(ws); // حذف بيانات الجهاز المتصل
     if (tunnels.get(tunnelId).size === 0) {
       tunnels.delete(tunnelId); // حذف النفق إذا لم يتبقى فيه اتصالات
     }
