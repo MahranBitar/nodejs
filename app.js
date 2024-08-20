@@ -11,10 +11,35 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 const tunnels = new Map(); // لتخزين الأنفاق النشطة
 const deviceData = new Map(); // لتخزين بيانات الأجهزة المتصلة
-const udpPort = 7551; // تعيين المنفذ المحدد
+const udpPorts = [7551, 19132]; // قائمة البورتات المطلوبة
 
 // إعداد خادم UDP
-const udpServer = dgram.createSocket("udp4");
+const udpServers = udpPorts.map(port => {
+  const server = dgram.createSocket("udp4");
+
+  server.on("message", (message, rinfo) => {
+    console.log(`Received UDP message on port ${port}: ${message} from ${rinfo.address}:${rinfo.port}`);
+    
+    // إرسال الرسالة إلى جميع العملاء في النفق المحدد
+    try {
+      for (const [tunnelId, clients] of tunnels) {
+        clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+          }
+        });
+      }
+    } catch (error) {
+      console.error(`Error sending UDP message to WebSocket clients: ${error}`);
+    }
+  });
+
+  server.bind(port, () => {
+    console.log(`UDP server is listening on port ${port}`);
+  });
+
+  return server;
+});
 
 // معالجة الطلبات على المسار '/'
 app.get("/", (req, res) => {
@@ -47,29 +72,16 @@ wss.on("connection", (ws, request) => {
   // التعامل مع الرسائل الواردة من WebSocket
   ws.on("message", (message) => {
     console.log(`[Tunnel ${tunnelId}] Received WebSocket message: ${message}`);
+    
+    // إرسال الرسالة إلى جميع العملاء في النفق
+    tunnels.get(tunnelId).forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    });
 
-    if (message.includes("broadcast")) {
-      // معالجة حزم البثوث
-      // إجراء التعديلات اللازمة على الحزمة
-      const modifiedMessage = `Modified: ${message}`;
-      
-      // إرسال الرسالة المعدلة إلى جميع العملاء في النفق
-      tunnels.get(tunnelId).forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(modifiedMessage);
-        }
-      });
-
-      // إرسال استجابة إلى جهاز A
-      ws.send("Message broadcasted to all clients.");
-    } else {
-      // معالجة الحزم الأخرى (مثل الحزم التي تحتوي على أرقام 19132 و7551)
-      udpServer.send(message, 0, message.length, udpPort, 'localhost', (err) => {
-        if (err) {
-          console.error(`Error sending UDP message: ${err}`);
-        }
-      });
-    }
+    // إرسال استجابة إلى جهاز A (إذا كان ذلك مطلوبًا)
+    ws.send("Message broadcasted to all clients.");
   });
 
   // التعامل مع إغلاق الاتصال
@@ -93,29 +105,6 @@ server.on("upgrade", (request, socket, head) => {
   } else {
     socket.destroy();
   }
-});
-
-// إعداد خادم UDP للاستماع
-udpServer.on("message", (message, rinfo) => {
-  console.log(`Received UDP message: ${message} from ${rinfo.address}:${rinfo.port}`);
-  
-  // إرسال الرسالة إلى جميع العملاء في النفق المحدد
-  try {
-    for (const [tunnelId, clients] of tunnels) {
-      clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(message);
-        }
-      });
-    }
-  } catch (error) {
-    console.error(`Error sending UDP message to WebSocket clients: ${error}`);
-  }
-});
-
-// تعيين المنفذ UDP المحدد واستدعاء الاستماع عليه
-udpServer.bind(udpPort, () => {
-  console.log(`UDP server is listening on port ${udpPort}`);
 });
 
 // تشغيل الخادم HTTP
