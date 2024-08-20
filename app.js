@@ -18,7 +18,7 @@ const udpServers = udpPorts.map(port => {
   const server = dgram.createSocket("udp4");
 
   server.on("message", (message, rinfo) => {
-    console.log(`Received UDP message on port ${port}: ${message} from ${rinfo.address}:${rinfo.port}`);
+    console.log(`Received UDP message on port ${port}`);
     
     // إرسال الرسالة إلى جميع العملاء في النفق المحدد
     try {
@@ -71,7 +71,7 @@ wss.on("connection", (ws, request) => {
 
   // التعامل مع الرسائل الواردة من WebSocket
   ws.on("message", (message) => {
-    console.log(`[Tunnel ${tunnelId}] Received WebSocket message: ${message}`);
+    console.log(`[Tunnel ${tunnelId}] Received WebSocket message`);
     
     // إرسال الرسالة إلى جميع العملاء في النفق
     tunnels.get(tunnelId).forEach((client) => {
