@@ -33,6 +33,8 @@ const udpServers = udpPorts.map(port => {
     }
   });
 
+  server.bind(port); // تأكد من بدء الاستماع على البورت المحدد
+
   return server;
 });
 
