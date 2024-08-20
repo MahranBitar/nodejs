@@ -10,7 +10,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 const tunnels = new Map(); // لتخزين الأنفاق النشطة
 const deviceData = new Map(); // لتخزين بيانات الأجهزة المتصلة
-const udpPorts = [7551, 19132]; // قائمة البورتات المطلوبة
+const udpPorts = [7551]; // قائمة البورتات المطلوبة
 
 // إعداد خوادم UDP
 const udpServers = udpPorts.map(port => {
