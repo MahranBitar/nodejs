@@ -4,15 +4,14 @@ const url = require("url");
 const uuid = require("uuid");
 const express = require("express");
 const dgram = require("dgram");
-
 const app = express();
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 const tunnels = new Map(); // لتخزين الأنفاق النشطة
-const deviceData = new Map(); // لتخزين بيانات الأجهزة المتصلة
-const requestMap = new Map(); // لتخزين الطلبات الأصلية والردود
+const clientResponses = new Map(); // لتخزين استجابات الأجهزة
 
-// نطاق البورتات الذي تريد الاستماع له
+// تحديد نطاق البورتات الذي تريد الاستماع له
 const portRangeStart = 1000; // بداية نطاق البورتات
 const portRangeEnd = 65535; // نهاية نطاق البورتات
 
@@ -22,7 +21,7 @@ const udpServers = [];
 // إنشاء خوادم UDP لكل بورت في النطاق المحدد
 for (let port = portRangeStart; port <= portRangeEnd; port++) {
   const udpServer = dgram.createSocket("udp4");
-
+  
   udpServer.on("message", (message, rinfo) => {
     console.log(`Received UDP message from ${rinfo.address}:${rinfo.port} on port ${port}`);
 
@@ -30,19 +29,14 @@ for (let port = portRangeStart; port <= portRangeEnd; port++) {
     for (const [tunnelId, clients] of tunnels) {
       clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
-          // تصحيح الحزمة: تغيير عنوان المصدر أو الوجهة حسب الحاجة
-          const correctedMessage = Buffer.from(message);
-          client.send(correctedMessage);
-
-          // تخزين معلومات حول الطلبات
-          requestMap.set(correctedMessage.toString('hex'), { originalSender: rinfo });
+          client.send(message);
         }
       });
     }
   });
 
   udpServer.bind(port, () => {
-    console.log(`UDP server bound to port ${port}`);
+    console.log(`UDP server listening on port ${port}`);
   });
 
   udpServers.push(udpServer);
@@ -73,7 +67,6 @@ wss.on("connection", (ws, request) => {
   }
   tunnels.get(tunnelId).add(ws);
 
-  deviceData.set(ws, { address: clientAddress });
   console.log(`User connected to tunnel ${tunnelId}`);
   console.log(`Tunnel URL: wss://${request.headers.host}/tunnel/${tunnelId}`);
 
@@ -83,35 +76,18 @@ wss.on("connection", (ws, request) => {
     // إرسال الرسالة إلى جميع العملاء في النفق
     tunnels.get(tunnelId).forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        // تصحيح الحزمة: تغيير عنوان المصدر أو الوجهة حسب الحاجة
-        const correctedMessage = Buffer.from(message);
-        client.send(correctedMessage);
-
-        // تخزين معلومات حول الطلبات
-        requestMap.set(correctedMessage.toString('hex'), { originalSender: ws });
+        client.send(message);
       }
     });
 
-    // إرسال استجابة إلى جهاز الإرسال إذا لزم الأمر
-    ws.send("Message broadcasted to all clients.");
-  });
-
-  ws.on("message", (message) => {
-    console.log(`Received message from client in tunnel: ${message}`);
-    const messageHex = Buffer.from(message).toString('hex');
-    const originalRequest = requestMap.get(messageHex);
-    
-    if (originalRequest) {
-      const { originalSender } = originalRequest;
-      // إعادة الاستجابة إلى الجهاز الأصلي
-      originalSender.send(message);
-    }
+    // استقبال الاستجابة من الأجهزة المتصلة
+    clientResponses.set(ws, message);
   });
 
   ws.on("close", () => {
     console.log(`[Tunnel ${tunnelId}] User disconnected.`);
     tunnels.get(tunnelId).delete(ws);
-    deviceData.delete(ws);
+    clientResponses.delete(ws);
     if (tunnels.get(tunnelId).size === 0) {
       tunnels.delete(tunnelId);
     }
