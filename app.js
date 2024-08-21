@@ -3,7 +3,7 @@ const http = require("http");
 const url = require("url");
 const uuid = require("uuid");
 const express = require("express");
-const dgram = require("dgram"); // مكتبة UDP
+const dgram = require("dgram");
 const app = express();
 
 const server = http.createServer(app);
@@ -26,16 +26,12 @@ for (let port = portRangeStart; port <= portRangeEnd; port++) {
     console.log(`Received UDP message from ${rinfo.address}:${rinfo.port} on port ${port}`);
 
     // إرسال الرسالة إلى جميع العملاء في النفق المحدد
-    try {
-      for (const [tunnelId, clients] of tunnels) {
-        clients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
-          }
-        });
-      }
-    } catch (error) {
-      console.error(`Error sending UDP message to WebSocket clients: ${error}`);
+    for (const [tunnelId, clients] of tunnels) {
+      clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+        }
+      });
     }
   });
 
@@ -98,7 +94,6 @@ wss.on("connection", (ws, request) => {
   });
 });
 
-
 // التعامل مع ترقية طلبات WebSocket
 server.on("upgrade", (request, socket, head) => {
   const pathname = url.parse(request.url).pathname;
@@ -114,9 +109,4 @@ server.on("upgrade", (request, socket, head) => {
 // تشغيل الخادم HTTP
 server.listen(process.env.PORT || 8080, () => {
   console.log("Server is listening on port 8080");
-wss.on("connection", (ws, request) => {
-  const clientAddress = request.socket.remoteAddress || ws._socket.remoteAddress;
-  console.log(`Client connected from IP: ${clientAddress}`);
-});
-
 });
