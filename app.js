@@ -16,24 +16,6 @@ const minecraftPort = 19132;
 // إعداد خادم UDP للاستماع لحزم الـ broadcast على البورت 19132
 const udpServer = dgram.createSocket("udp4");
 
-udpServer.on("message", (message, rinfo) => {
-    console.log(`Received UDP broadcast message from ${rinfo.address}:${rinfo.port} on port ${minecraftPort}`);
-
-    // إرسال الرسالة إلى جميع العملاء في جميع الأنفاق
-    for (const [tunnelId, clients] of tunnels) {
-        clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(message);
-            }
-        });
-    }
-});
-
-// الربط بالبورت 19132 للاستماع لحزم البث
-udpServer.bind(minecraftPort, () => {
-    console.log(`UDP server listening for Minecraft Bedrock broadcasts on port ${minecraftPort}`);
-});
-
 // معالجة الطلبات على المسار '/'
 app.get("/", (req, res) => {
     res.send("Welcome to the Tunnel Server!");
@@ -65,7 +47,7 @@ wss.on("connection", (ws, request) => {
     ws.on("message", (message) => {
         console.log(`[Tunnel ${tunnelId}] Received WebSocket message`);
 
-        // إرسال الرسالة إلى جميع العملاء في النفق
+        // إرسال الحزمة إلى جميع العملاء في النفق
         tunnels.get(tunnelId).forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(message);
