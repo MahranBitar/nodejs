@@ -16,6 +16,28 @@ const minecraftPort = 19132;
 // إعداد خادم UDP للاستماع لحزم الـ broadcast على البورت 19132
 const udpServer = dgram.createSocket("udp4");
 
+// التعامل مع الحزم المستلمة من الأجهزة المحلية
+udpServer.on("message", (message, rinfo) => {
+    console.log(`Received packet from ${rinfo.address}:${rinfo.port}`);
+
+    // إعادة بث الحزمة إلى جميع الأجهزة عبر الشبكة المحلية
+    udpServer.send(message, 0, message.length, minecraftPort, "224.0.2.60", () => {
+        console.log("Rebroadcasted packet to multicast group 224.0.2.60");
+    });
+
+    // إعادة إرسال الحزمة إلى جميع العملاء في النفق عبر WebSocket
+    tunnels.forEach((clients, tunnelId) => {
+        clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(message);
+                console.log(`[Tunnel ${tunnelId}] Sent packet to WebSocket client`);
+            }
+        });
+    });
+});
+
+udpServer.bind(minecraftPort);
+
 // معالجة الطلبات على المسار '/'
 app.get("/", (req, res) => {
     res.send("Welcome to the Tunnel Server!");
@@ -54,6 +76,11 @@ wss.on("connection", (ws, request) => {
                 console.log(`[Tunnel ${tunnelId}] Sent message to client: ${message}`);
             }
         });
+
+        // إرسال الحزمة عبر UDP إلى خادم Minecraft المحلي
+        udpServer.send(message, 0, message.length, minecraftPort, "127.0.0.1", () => {
+            console.log("Sent packet to local Minecraft server");
+        });
     });
 
     ws.on("close", () => {
@@ -64,8 +91,6 @@ wss.on("connection", (ws, request) => {
         }
     });
 });
-
-
 
 // التعامل مع ترقية طلبات WebSocket
 server.on("upgrade", (request, socket, head) => {
