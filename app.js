@@ -51,9 +51,20 @@ wss.on("connection", (ws, request) => {
         tunnels.get(tunnelId).forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(message);
+                console.log(`[Tunnel ${tunnelId}] Sent message to client: ${message}`);
             }
         });
     });
+
+    ws.on("close", () => {
+        console.log(`[Tunnel ${tunnelId}] User disconnected.`);
+        tunnels.get(tunnelId).delete(ws);
+        if (tunnels.get(tunnelId).size === 0) {
+            tunnels.delete(tunnelId);
+        }
+    });
+});
+
 
     ws.on("close", () => {
         console.log(`[Tunnel ${tunnelId}] User disconnected.`);
