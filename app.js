@@ -4,8 +4,8 @@ const url = require("url");
 const uuid = require("uuid");
 const express = require("express");
 const dgram = require("dgram");
-const app = express();
 
+const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 const tunnels = new Map(); // لتخزين الأنفاق النشطة
@@ -19,18 +19,20 @@ const udpServer = dgram.createSocket("udp4");
 // التعامل مع الحزم المستلمة من الأجهزة المحلية
 udpServer.on("message", (message, rinfo) => {
     console.log(`Received packet from ${rinfo.address}:${rinfo.port}`);
+    console.log("Packet data before sending via WebSocket:");
+    console.log(message);  // طباعة الحزمة قبل إرسالها عبر WebSocket
 
-    // إعادة بث الحزمة إلى جميع الأجهزة عبر الشبكة المحلية
+    // إعادة بث الحزمة إلى جميع العملاء عبر الشبكة المحلية
     udpServer.send(message, 0, message.length, minecraftPort, "224.0.2.60", () => {
         console.log("Rebroadcasted packet to multicast group 224.0.2.60");
     });
 
-    // إعادة إرسال الحزمة إلى جميع العملاء في النفق عبر WebSocket
+    // إرسال الحزمة إلى جميع العملاء في النفق عبر WebSocket
     tunnels.forEach((clients, tunnelId) => {
         clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
+                console.log(`[Tunnel ${tunnelId}] Sending packet to WebSocket client`);
                 client.send(message);
-                console.log(`[Tunnel ${tunnelId}] Sent packet to WebSocket client`);
             }
         });
     });
@@ -68,14 +70,7 @@ wss.on("connection", (ws, request) => {
 
     ws.on("message", (message) => {
         console.log(`[Tunnel ${tunnelId}] Received WebSocket message`);
-
-        // إرسال الحزمة إلى جميع العملاء في النفق
-        tunnels.get(tunnelId).forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(message);
-                console.log(`[Tunnel ${tunnelId}] Sent message to client: ${message}`);
-            }
-        });
+        console.log(message);  // طباعة الرسالة قبل إرسالها عبر UDP
 
         // إرسال الحزمة عبر UDP إلى خادم Minecraft المحلي
         udpServer.send(message, 0, message.length, minecraftPort, "127.0.0.1", () => {
