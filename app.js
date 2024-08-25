@@ -66,14 +66,6 @@ wss.on("connection", (ws, request) => {
 });
 
 
-    ws.on("close", () => {
-        console.log(`[Tunnel ${tunnelId}] User disconnected.`);
-        tunnels.get(tunnelId).delete(ws);
-        if (tunnels.get(tunnelId).size === 0) {
-            tunnels.delete(tunnelId);
-        }
-    });
-});
 
 // التعامل مع ترقية طلبات WebSocket
 server.on("upgrade", (request, socket, head) => {
