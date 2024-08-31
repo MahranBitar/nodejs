@@ -32,7 +32,7 @@ udpServer.on("message", (message, rinfo) => {
         clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
                 console.log(`[Tunnel ${tunnelId}] Sending packet to WebSocket client`);
-                client.send(message);
+                client.send(message, { binary: true }); // إرسال البيانات كبيانات ثنائية
             }
         });
     });
