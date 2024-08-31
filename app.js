@@ -4,7 +4,6 @@ const url = require("url");
 const uuid = require("uuid");
 const express = require("express");
 const dgram = require("dgram");
-const { Buffer } = require("buffer");
 
 const app = express();
 const server = http.createServer(app);
@@ -73,33 +72,8 @@ wss.on("connection", (ws, request) => {
         console.log(`[Tunnel ${tunnelId}] Received WebSocket message`);
         console.log(message);  // طباعة الرسالة قبل إرسالها عبر UDP
 
-        // تعديل عنوان الوجهة في الحزمة
-        const ipHeaderLength = 20; // طول رأس IP في البايت
-        const destinationIpOffset = 16; // موقع عنوان الوجهة في الحزمة (بعد الرأس)
-
-        // استخراج عنوان الوجهة الحالي
-        let packet = Buffer.from(message);
-        let newDestinationIp = ws._socket.remoteAddress.split('.').map(Number); // عنوان IP للعميل
-
-        // تعديل عنوان الوجهة في الحزمة
-        if (packet.length > ipHeaderLength + destinationIpOffset + 3) {
-            // تحديث عنوان الوجهة (يجب التأكد من تعديل 4 بايت لعنوان IP)
-            for (let i = 0; i < 4; i++) {
-                packet[ipHeaderLength + destinationIpOffset + i] = newDestinationIp[i];
-            }
-
-            // تحديث طول الحزمة
-            let packetLength = packet.length;
-            packet.writeUInt16BE(packetLength, 2); // تحديث الطول (حسب موقع الطول في الحزمة)
-
-            console.log("Modified packet data after changing destination IP:");
-            console.log(packet);
-        } else {
-            console.log("Packet is too short to modify the destination IP.");
-        }
-
         // إرسال الحزمة عبر UDP إلى خادم Minecraft المحلي
-        udpServer.send(packet, 0, packet.length, minecraftPort, "127.0.0.1", () => {
+        udpServer.send(message, 0, message.length, minecraftPort, "127.0.0.1", () => {
             console.log("Sent packet to local Minecraft server");
         });
     });
