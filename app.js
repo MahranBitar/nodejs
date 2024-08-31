@@ -9,6 +9,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 const tunnels = new Map(); // لتخزين الأنفاق النشطة
+const clientAddresses = new Map(); // لتخزين عناوين IP للأجهزة المتصلة
 
 // البورت الذي تستخدمه ماين كرافت Bedrock للبث واكتشاف العوالم
 const minecraftPort = 19132;
@@ -27,14 +28,18 @@ udpServer.on("message", (message, rinfo) => {
         console.log("Rebroadcasted packet to multicast group 224.0.2.60");
     });
 
-    // إرسال الحزمة إلى جميع العملاء في النفق عبر WebSocket
+    // إرسال الحزمة إلى أول عميل في النفق فقط
     tunnels.forEach((clients, tunnelId) => {
-        clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                console.log(`[Tunnel ${tunnelId}] Sending packet to WebSocket client`);
-                client.send(message, { binary: true }); // إرسال البيانات كبيانات ثنائية
+        const firstClient = Array.from(clients)[0]; // الحصول على أول عميل
+        if (firstClient && firstClient.readyState === WebSocket.OPEN) {
+            // تحقق من أن الحزمة لا تُرسل إلى الجهاز الذي أرسلها
+            if (clientAddresses.get(firstClient) !== rinfo.address) {
+                console.log(`[Tunnel ${tunnelId}] Sending packet to first WebSocket client`);
+                firstClient.send(message, { binary: true }); // إرسال البيانات كبيانات ثنائية
+            } else {
+                console.log(`Ignored packet from ${rinfo.address} to client`);
             }
-        });
+        }
     });
 });
 
@@ -65,6 +70,9 @@ wss.on("connection", (ws, request) => {
     }
     tunnels.get(tunnelId).add(ws);
 
+    // تخزين عنوان IP للعميل
+    clientAddresses.set(ws, clientAddress);
+
     console.log(`User connected to tunnel ${tunnelId}`);
     console.log(`Tunnel URL: wss://${request.headers.host}/tunnel/${tunnelId}`);
 
@@ -81,6 +89,7 @@ wss.on("connection", (ws, request) => {
     ws.on("close", () => {
         console.log(`[Tunnel ${tunnelId}] User disconnected.`);
         tunnels.get(tunnelId).delete(ws);
+        clientAddresses.delete(ws); // إزالة عنوان IP للعميل عند قطع الاتصال
         if (tunnels.get(tunnelId).size === 0) {
             tunnels.delete(tunnelId);
         }
