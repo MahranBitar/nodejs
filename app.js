@@ -88,6 +88,10 @@ wss.on("connection", (ws, request) => {
                 packet[ipHeaderLength + destinationIpOffset + i] = newDestinationIp[i];
             }
 
+            // تحديث طول الحزمة
+            let packetLength = packet.length;
+            packet.writeUInt16BE(packetLength, 2); // تحديث الطول (حسب موقع الطول في الحزمة)
+
             console.log("Modified packet data after changing destination IP:");
             console.log(packet);
         } else {
