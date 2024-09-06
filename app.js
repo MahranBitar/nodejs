@@ -20,27 +20,25 @@ const udpServer = dgram.createSocket("udp4");
 // التعامل مع الحزم المستلمة من الأجهزة المحلية
 udpServer.on("message", (message, rinfo) => {
     console.log(`Received packet from ${rinfo.address}:${rinfo.port}`);
+    console.log(`Packet length: ${message.length}`);
     console.log("Packet data before sending via WebSocket:");
     console.log(message);  // طباعة الحزمة قبل إرسالها عبر WebSocket
 
-    // إعادة بث الحزمة إلى جميع العملاء عبر الشبكة المحلية
-    udpServer.send(message, 0, message.length, minecraftPort, "224.0.2.60", () => {
-        console.log("Rebroadcasted packet to multicast group 224.0.2.60");
-    });
-
-    // إرسال الحزمة إلى أول عميل في النفق فقط
+    // إرسال الحزمة إلى جميع عملاء النفق باستثناء الجهاز الذي أرسلها
     tunnels.forEach((clients, tunnelId) => {
-        const firstClient = Array.from(clients)[0]; // الحصول على أول عميل
-        if (firstClient && firstClient.readyState === WebSocket.OPEN) {
-            // تحقق من أن الحزمة لا تُرسل إلى الجهاز الذي أرسلها
-            if (clientAddresses.get(firstClient) !== rinfo.address) {
-                console.log(`[Tunnel ${tunnelId}] Sending packet to first WebSocket client`);
-                firstClient.send(message, { binary: true }); // إرسال البيانات كبيانات ثنائية
-            } else {
-                console.log(`Ignored packet from ${rinfo.address} to client`);
+        clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN && clientAddresses.get(client) !== rinfo.address) {
+                console.log(`[Tunnel ${tunnelId}] Sending packet to WebSocket client ${clientAddresses.get(client)}`);
+                client.send(message, { binary: true });
             }
-        }
+        });
     });
+});
+
+// التعامل مع الأخطاء في UDP
+udpServer.on("error", (err) => {
+    console.error(`UDP server error:\n${err.stack}`);
+    udpServer.close();
 });
 
 udpServer.bind(minecraftPort);
@@ -88,11 +86,19 @@ wss.on("connection", (ws, request) => {
 
     ws.on("close", () => {
         console.log(`[Tunnel ${tunnelId}] User disconnected.`);
-        tunnels.get(tunnelId).delete(ws);
-        clientAddresses.delete(ws); // إزالة عنوان IP للعميل عند قطع الاتصال
-        if (tunnels.get(tunnelId).size === 0) {
-            tunnels.delete(tunnelId);
+        const tunnel = tunnels.get(tunnelId);
+        if (tunnel) {
+            tunnel.delete(ws);
+            clientAddresses.delete(ws);
+            if (tunnel.size === 0) {
+                tunnels.delete(tunnelId);
+            }
         }
+    });
+
+    // التعامل مع الأخطاء في WebSocket
+    ws.on("error", (error) => {
+        console.error(`WebSocket error:\n${error.stack}`);
     });
 });
 
